@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Firebase+Snabbdom workshop</title>
+    <style>
+        body {
+            margin-left: 150px;
+        }
+
+        .big_link {
+            font-size: 30px;
+        }
+    </style>
+</head>
+<body>
+<h1>Firebase + Snabbdom Workshop</h1>
+<h2>Step 1: Checkout from git:</h2>
+<a class='big_link' href="http://goo.gl/vC7Zuw">goo.gl/vC7Zuw</a>
+
+<h2>Step 2: Open index.html in browser</h2>
+Go to folder where you checked out and open index HTML to see this page
+
+<h2>Step 3: Open app in brower</h2>
+<a class='big_link' href="./app.html">Open application</a>
+
+<h2>Step 4: Open app.html and app.js in editor to inspect the code</h2>
+
+<h2>Step 5: Add persistence with Firebase</h2>
+<pre>What will you need to do usually to add persistence?
+At best you will need to have hosting with some backend and database.
+Then you will need setup a database for your project,
+integrate it with your backend and write some RestAPI.
+Connect your front end app to that RestAPI and your are done.
+How long will it take you?
+
+What if you have half and hour to do that? Let's do it with Firebase!</pre>
+<a class='big_link' href="https://firebase.google.com/">Let's go to Firebase site</a>
+<ol>
+    <li>Go to Console</li>
+    <li>Create new Project</li>
+    <li>Add Firebase configuration to your web app</li>
+    <li>Modify our app state to save to Firebase on changes</li>
+    <pre>
+        //decorator to trigger changes
+        function AddCallbackAfter(object, name, callback) {
+            var original = object[name];
+            object[name] = function () {
+                var result = original.apply(object, arguments);
+                callback(object);
+                return result;
+            }
+        }
+
+        ['createTopic','createSubTopic','updateTopic','updateSubTopic'].forEach(function(key) {
+           AddCallbackAfter(db,key,function(db) {
+              console.log(JSON.stringify(db.topics));
+           });
+        });
+    </pre>
+
+    <pre>
+        var ref = firebase.database().ref('planner');
+        function save(state) {
+            ref.set(state);
+        }
+    </pre>
+    Did not work.
+    We need to modify database access rules in Firebase console
+    <pre>
+        {
+          "rules": {
+            ".read": true,
+            ".write": true
+          }
+        }
+    </pre>
+    <li>Modify our app state to load from Firebase on load</li>
+    <pre>
+        ref.once('value').then( function (topicsSnapshot) {
+            db = createDB(topicsSnapshot.val());
+            createUI();
+        });
+    </pre>
+</ol>
+
+<h2>Step 6: Let's make it realtime</h2>
+    <pre>
+        ref.on('change',function(snapshot) {
+            db.topics = snapshot;
+            createUI();
+        });
+    </pre>
+Let's try and see how it works?
+We loose focus, can't really use it.
+
+How do we solve this problem?
+
+
+<h2>Step 7: Virtual dome to the rescue: Why snabbdom?</h2>
+<a href="https://github.com/snabbdom/snabbdom"> Snabbdom </a>
+<ol>
+    <li>Minimalistic, no hooks attached 7Kb vs React 93Kb</li>
+    <li>No JSX - I dislike mixing JS with HTML</li>
+    <li><a href="https://github.com/snabbdom/snabbdom-to-html">Server side rendering</a> and <a
+            href="https://www.npmjs.com/package/snabbdom-virtualize">client-side rehydration modules</a></li>
+    <li><a href="http://vdom-benchmark.github.io/vdom-benchmark/">Performance</a> ~5x faster then react</li>
+    <li>Cool features for <a href="https://github.com/snabbdom/snabbdom#examples">animations</a></li>
+</ol>
+
+Add snabbdom
+<pre>
+    &lt;script src=&quot;https://cdnjs.cloudflare.com/ajax/libs/snabbdom/0.5.4/h.min.js&quot;&gt;&lt;/script&gt;
+    &lt;script src=&quot;https://cdnjs.cloudflare.com/ajax/libs/snabbdom/0.5.4/snabbdom_attributes.min.js&quot;&gt;&lt;/script&gt;
+    &lt;script src=&quot;https://cdnjs.cloudflare.com/ajax/libs/snabbdom/0.5.4/snabbdom_class.min.js&quot;&gt;&lt;/script&gt;
+    &lt;script src=&quot;https://cdnjs.cloudflare.com/ajax/libs/snabbdom/0.5.4/snabbdom_eventlisteners.min.js&quot;&gt;&lt;/script&gt;
+    &lt;script src=&quot;https://cdnjs.cloudflare.com/ajax/libs/snabbdom/0.5.4/snabbdom_props.min.js&quot;&gt;&lt;/script&gt;
+    &lt;script src=&quot;https://cdnjs.cloudflare.com/ajax/libs/snabbdom/0.5.4/snabbdom_style.min.js&quot;&gt;&lt;/script&gt;
+    &lt;script src=&quot;https://cdnjs.cloudflare.com/ajax/libs/snabbdom/0.5.4/snabbdom.min.js&quot;&gt;&lt;/script&gt;
+</pre>
+
+Create patch function
+<pre>
+    var patch = snabbdom.init([
+        snabbdom_style,
+        snabbdom_class,
+        snabbdom_props,
+        snabbdom_attributes,
+        snabbdom_eventlisteners
+    ]);
+</pre>
+
+Let's try if it works
+<pre>
+    var vnode = h('span', 'Loading...');
+    patch(container, vnode);
+
+    //In createUI();
+    vnode = patch(vnode,
+        h('span','Loaded')
+    );
+</pre>
+
+Well now that this works let's rewrite our UI code to virtual dom
+
+Now let's add events using 'on' where we need it
+<pre>
+    on: {
+        keyup: function(e){
+            db.updateTopic(topic.key, e.currentTarget.value);
+        }
+    }
+</pre>
+
+
+And it works
+Still problem with conflict resolution that can be solved with transactions, we won't go there today
+
+So what did Snabbdom give us?
+<ul>
+    <li>In short we switched to declarative approach to our UI, we describe what we want, not how to get it</li>
+    <li>Also our UI is now stateless and just a mapping of Buisness data to UI</li>
+    <li>We also do not care about our data architecture, all we need is mapping from it to UI</li>
+    <li>We do not need to think about event management aether</li>
+    <li>All in all our code is simpler, mental model of our app is simpler, and there is just less code</li>
+    <li>As a bonus its pretty fast by default as it updates only things that changed</li>
+</ul>
+
+There is one problem though in our app, and its conflict resolution, it can be solved with Firebase transactions
+
+But let's instead play with other interesting thing, user access rights and authentication
+
+<h2>Step 8: Let's add authentication </h2>
+First thing, let's return access rule so that only authenticated users can read and write
+<ol>
+    <li><a href="https://console.firebase.google.com">Let's go to console</a></li>
+    <li>Go to our project</li>
+    <li>Go to database</li>
+    <li>Go to rules</li>
+    <li>And return it to only auth</li>
+    <pre>
+        {
+          "rules": {
+            ".read": "auth != null",
+            ".write": "auth != null"
+          }
+        }
+    </pre>
+</ol>
+
+Now let's enable authentication with google for our app
+<ol>
+    <li>Go to authentication</li>
+    <li>Enable google authentication</li>
+</ol>
+
+Write some code to check for authentication
+<pre>
+    firebase.auth().onAuthStateChanged(function (user) {
+        if (!db) {
+            db = createDB([]);
+        }
+        db.setUser(user);
+    });
+
+    //DB
+    db.setUser = function (user) {
+        db.currentUser = user;
+        createUI();
+    };
+</pre>
+
+And let's add rendering of it
+<pre>
+    function userPanel(db) {
+        var content = db.currentUser ?
+            h('div',[
+                h('img',{props:{src: db.currentUser.photoURL}}),
+                h('div',[h('button','Sign Out')])
+            ])
+            :
+            h('button','Sign In');
+
+        return h('div.userPanel',[content]);
+    }
+
+    //style
+    .userPanel img {
+        max-width: 65px;
+        max-height: 65px;
+        float:left;
+    }
+
+    .userPanel {
+        position: fixed;
+        top: 0;
+        right: 0;
+    }
+</pre>
+
+Sign in and sign out code
+<pre>
+    function signOut() {
+        firebase.auth().signOut();
+    }
+
+    function signIn() {
+        var provider = new firebase.auth.GoogleAuthProvider();
+        firebase.auth().signInWithPopup(provider).catch(function (error) {
+            var errorCode = error.code;
+            var errorMessage = error.message;
+            var email = error.email;
+            var credential = error.credential;
+            console.log(errorCode, errorMessage, email, credential);
+            alert(errorMessage);
+        });
+    }
+
+    //also add it to click events in UI code
+</pre>
+
+<pre>Now we can try to signin, sadly it won't work because we are coming from file://
+We now need to switch to serving from localhost.
+That's where npm come in handy.
+    npm install node-static
+    node node_modules/node-static/bin/cli
+    <a href="localhost:8080">localhost:8080</a>
+    And now it should work
+</pre>
+
+<h2>Step 9: Some more fun with realtime database</h2>
+
+<pre>
+Now let's have some fun with Firebase realtime features and user rights
+First we modify rules for our firebase
+</pre>
+
+<pre>
+  "users": {
+      "$user_id": {
+        // grants write access to the owner of this user account
+        // whose uid must exactly match the key ($user_id)
+        ".write": "$user_id === auth.uid",
+          ".read": "auth != null"
+      }
+    }
+</pre>
+
+<pre>
+Now we have document with user profiles which other users can read, but only owners can modify
+
+Let's add modification of our user profiles when user moves his mouse
+</pre>
+<pre>
+    function mouseMove(e) {
+        db.setUserPos(e.pageX, e.pageY);
+    }
+
+    //in auth change
+        document.addEventListener('mousemove', mouseMove);
+        document.removeEventListener('mousemove', mouseMove);
+
+
+    // in DB definition
+    db.setUserPos = function (x, y) {
+        firebase.database().ref('users/' + db.currentUser.uid).set({
+            name: db.currentUser.displayName,
+            email: db.currentUser.email,
+            picture: db.currentUser.photoURL,
+            x: x,
+            y: y,
+            time: new Date().getTime()
+        });
+    };
+</pre>
+<pre>
+Now we write user info + his mouse coordinate on our app + timestamp
+
+Let's now subscribe to changes and render our users on our page
+</pre>
+<pre>
+    var userRef = firebase.database().ref('users');
+    //in auth
+        userRef.on('value', onUserChanges);
+
+        userRef.off();
+
+    //in createUI
+    function users(db) {
+        return h('span',Object.keys(db.users).map(function (userId) {
+            var user = db.users[userId];
+            return h('img.user', {
+                props: {
+                    src: user.picture,
+                    title: user.name
+                },
+                style: {
+                    left: user.x + 'px',
+                    top: user.y + 'px'
+                }
+            })
+        }));
+    }
+    //in style
+    .user {
+        margin-left: -15px;
+        margin-top: -15px;
+        max-width: 30px;
+        max-height: 30px;
+        position: absolute;
+        pointer-events: none;
+        opacity: 0.5;
+        transition: all 0.1s ease-in-out 0s;
+    }
+</pre>
+
+And here we have flying users all over the page and can see where users look or work right now
+
+<h2> P.S: What else can we do</h2>
+<ul>
+    <li><a href="https://firebase.googleblog.com/2013/03/where-does-firebase-fit-in-your-app.html">Firebase application architectures</a></li>
+    <li>Firebase hoting + custom domains</li>
+    <li>Store and retrieve user-generated files like images, audio, and video without server-side code</li>
+    <li>Many features for iOS and Android apps which is of no interest to us :)</li>
+</ul>
+</body>
+</html>
