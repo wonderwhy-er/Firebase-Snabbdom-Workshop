@@ -86,8 +86,12 @@ What if you have half and hour to do that? Let's do it with Firebase!</pre>
 
 <h2>Step 6: Let's make it realtime</h2>
     <pre>
-        ref.on('change',function(snapshot) {
-            db.topics = snapshot;
+        var db;
+        ref.on('value',function(snapshot) {
+            if(!db) {
+                db = createDB();
+            }
+            db.topics = snapshot.val();
             createUI();
         });
     </pre>
