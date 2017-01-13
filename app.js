@@ -71,8 +71,11 @@ function save(state) {
 }
 
 var db;
-ref.once('value').then( function (topicsSnapshot) {
-    db = createDB(topicsSnapshot.val());
+ref.on('value', function (snapshot) {
+    if (!db) {
+        db = createDB();
+    }
+    db.topics = snapshot.val();
     createUI();
 });
 
@@ -81,51 +84,64 @@ ref.once('value').then( function (topicsSnapshot) {
 
 //UI
 
+var patch = snabbdom.init([
+    snabbdom_style,
+    snabbdom_class,
+    snabbdom_props,
+    snabbdom_attributes,
+    snabbdom_eventlisteners
+]);
+
+
 var container = document.getElementById('container');
+
+var vnode = patch(container, h('span', 'Loading...'));
+
+function button(label, callback) {
+    return h('button', {
+        on: {
+            click: callback
+        }
+    }, label);
+}
+
+function input(value, callback) {
+    return h('input', {
+        on: {
+            keyup: callback
+        },
+        props: {
+            value: value
+        }
+    });
+}
+
 function createUI() {
-    container.innerHTML = '';
-    var topics = fromHTMLString('<div></div>')[0];
-    container.appendChild(topics)
-    container.appendChild(footer(db, topics));
-
-
-    db.topics.forEach(function (topic) {
-        addTopicElement(db, topic, topics);
-    });
+    vnode = patch(vnode,
+        h('div', db.topics.map(function (topic) {
+                return topicElement(db, topic);
+            }).concat(footer(db))
+        )
+    );
 }
 
-function fromHTMLString(str) {
-    var div = document.createElement('div');
-    div.innerHTML = str;
-    return div.children;
-}
 
-function topic(db, topic) {
-    var topicElement = fromHTMLString(
-        `<div><hr>
-<input value="${topic.text}"/><button>add subtopic</button>
-<div>
-<ul></ul>
-</div>
-</div>`)[0];
-
-    var input = topicElement.children[1];
-    input.addEventListener('keyup', function () {
-        db.updateTopic(topic.key, input.value);
-    });
-    var subtopics = topicElement.children[3].children[0];
-    topicElement.children[2].addEventListener('click', function () {
-        var subtopicData = db.createSubTopic(topic.key);
-        addSubTopicElement(db, topic, subtopicData, subtopics);
-    });
-
-    if(topic.subtopics) {
-        topic.subtopics.forEach(function (subtopicData) {
-            addSubTopicElement(db, topic, subtopicData, subtopics);
-        });
-    }
-    
-    return topicElement;
+function topicElement(db, topic) {
+    return h('div', [
+        h('hr'),
+        input(topic.text, function () {
+            db.updateTopic(topic.key, e.currentTarget.value);
+        }),
+        button('add subtopic', function () {
+            var subtopicData = db.createSubTopic(topic.key);
+        })
+    ].concat(
+        topic.subtopics ?
+            topic.subtopics.map(function (subtopic) {
+                return subtopicElement(db, topic, subtopic);
+            })
+            : []
+    ))
 }
 
 function addSubTopicElement(db, topic, subtopicData, subTopicsElement) {
@@ -133,27 +149,23 @@ function addSubTopicElement(db, topic, subtopicData, subTopicsElement) {
     subTopicsElement.appendChild(subtopicElement);
 }
 
-function subtopic(db, topic, subtopicData) {
-    var element = fromHTMLString(`<li><input value="${subtopicData.text}"></li>`)[0];
-    var input = element.children[0];
-    input.addEventListener('keyup', function () {
-        db.updateSubTopic(topic.key, subtopicData.key, input.value);
-    });
-    return element;
-}
-
-function addTopicElement(db, topicData, topicContainer) {
-    var topicElement = topic(db, topicData);
-    topicContainer.appendChild(topicElement);
+function subtopicElement(db, topic, subtopicData) {
+    return h('li', [
+        input(subtopicData.text, function (e) {
+            db.updateSubTopic(topic.key, subtopicData.key, e.currentTarget.value);
+        })
+    ])
 }
 
 function footer(db, topicContainer) {
-    var footer = fromHTMLString(`<div><hr><button>add topic</button></div>`)[0];
-    footer.children[1].addEventListener('click', function () {
-        var topicData = db.createTopic();
-        addTopicElement(db, topicData, topicContainer);
-    });
-    return footer;
+    return h('div', [
+        h('hr'),
+        button('add topic',
+            function () {
+                db.createTopic()
+            }
+        )
+    ]);
 }
 
 //UI
