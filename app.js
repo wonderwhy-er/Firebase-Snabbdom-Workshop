@@ -169,7 +169,8 @@ function button(label, callback) {
 }
 
 function users(db) {
-    return h('span',Object.keys(db.users).map(function (userId) {
+
+    return h('span',Object.keys(db.users || {}).map(function (userId) {
         var user = db.users[userId];
         return h('img.user', {
             props: {
