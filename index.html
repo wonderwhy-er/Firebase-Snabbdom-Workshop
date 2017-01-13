@@ -27,14 +27,19 @@ Go to folder where you checked out and open index HTML to see this page
 <h2>Step 4: Open app.html and app.js in editor to inspect the code</h2>
 
 <h2>Step 5: Add persistence with Firebase</h2>
-<pre>What will you need to do usually to add persistence?
-At best you will need to have hosting with some backend and database.
-Then you will need setup a database for your project,
-integrate it with your backend and write some RestAPI.
-Connect your front end app to that RestAPI and your are done.
-How long will it take you?
+<pre>What will you need to do usually to add persistence?</pre>
+<ol>
+    <li>Hosting with backend and database</li>
+    <li>Setup database</li>
+    <li>Write beckend + database code</li>
+    <li>Write Rest API</li>
+    <li>Write code on your client to integrate Rest API</li>
+</ol>
 
+<pre>How long will it take you?
 What if you have half and hour to do that? Let's do it with Firebase!</pre>
+<a class='big_link' href="https://www.google.lv/search?q=stopwatch">Stopwatch</a>
+<br/>
 <a class='big_link' href="https://firebase.google.com/">Let's go to Firebase site</a>
 <ol>
     <li>Go to Console</li>
@@ -82,9 +87,17 @@ What if you have half and hour to do that? Let's do it with Firebase!</pre>
             createUI();
         });
     </pre>
+    <pre>
+        And it's done!
+        How much time did it take?
+    </pre>
 </ol>
 
 <h2>Step 6: Let's make it realtime</h2>
+<pre>
+I did mentioned that Firebase is realtime database that works over sockets?
+Let's try it out
+</pre>
     <pre>
         var db;
         ref.on('value',function(snapshot) {
@@ -95,11 +108,15 @@ What if you have half and hour to do that? Let's do it with Firebase!</pre>
             createUI();
         });
     </pre>
-Let's try and see how it works?
+
+<pre>Let's try and see how it works?
 We loose focus, can't really use it.
 
 How do we solve this problem?
-
+Well if we go something like 5 years ago and try to imagine how to solve it with something like <b>BackBone or Angular 1</b>
+We will need to write complex logic of detecting changes and updating UI based on them ourselves
+But today we can cut this corner too
+</pre>
 
 <h2>Step 7: Virtual dome to the rescue: Why snabbdom?</h2>
 <a href="https://github.com/snabbdom/snabbdom"> Snabbdom </a>
@@ -136,18 +153,37 @@ Create patch function
 
 Let's try if it works
 <pre>
-    var vnode = h('span', 'Loading...');
-    patch(container, vnode);
+    var vnode = patch(container, h('span', 'Loading...'));
 
     //In createUI();
     vnode = patch(vnode,
         h('span','Loaded')
     );
 </pre>
-
+<pre>
 Well now that this works let's rewrite our UI code to virtual dom
 
+    function button(label, callback) {
+        return h('button', {
+            on: {
+                click: callback
+            }
+        }, label);
+    }
+
+    function input(value, callback) {
+        return h('input', {
+            on: {
+                keyup: callback
+            },
+            props: {
+                value: value
+            }
+        });
+    }
+
 Now let's add events using 'on' where we need it
+</pre>
 <pre>
     on: {
         keyup: function(e){
@@ -155,12 +191,12 @@ Now let's add events using 'on' where we need it
         }
     }
 </pre>
-
-
+<pre>
 And it works
 Still problem with conflict resolution that can be solved with transactions, we won't go there today
 
 So what did Snabbdom give us?
+</pre>
 <ul>
     <li>In short we switched to declarative approach to our UI, we describe what we want, not how to get it</li>
     <li>Also our UI is now stateless and just a mapping of Buisness data to UI</li>
@@ -362,7 +398,8 @@ And here we have flying users all over the page and can see where users look or 
 
 <h2> P.S: What else can we do</h2>
 <ul>
-    <li><a href="https://firebase.googleblog.com/2013/03/where-does-firebase-fit-in-your-app.html">Firebase application architectures</a></li>
+    <li><a href="https://firebase.googleblog.com/2013/03/where-does-firebase-fit-in-your-app.html">Firebase application
+        architectures</a></li>
     <li>Firebase hoting + custom domains</li>
     <li>Store and retrieve user-generated files like images, audio, and video without server-side code</li>
     <li>Many features for iOS and Android apps which is of no interest to us :)</li>
