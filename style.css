@@ -1,0 +1,21 @@
+.userPanel img {
+    max-width: 65px;
+    max-height: 65px;
+    float:left;
+}
+
+.userPanel {
+    position: fixed;
+    top: 0;
+    right: 0;
+}
+
+.user {
+    margin-left: -15px;
+    margin-top: -15px;
+    max-width: 30px;
+    max-height: 30px;
+    position: absolute;
+    pointer-events: none;
+    opacity: 0.5;
+}

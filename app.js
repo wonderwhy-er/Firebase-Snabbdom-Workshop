@@ -8,6 +8,11 @@ function createDB(topics) {
         topics: topics
     };
 
+    db.setUser = function (user) {
+        db.currentUser = user;
+        createUI();
+    };
+
     db.createTopic = function () {
         db.topics.push({
             subtopics: [],
@@ -49,6 +54,17 @@ function createDB(topics) {
         subTopic.text = text;
     };
 
+    db.setUserPos = function (x, y) {
+        firebase.database().ref('users/' + db.currentUser.uid).set({
+            name: db.currentUser.displayName,
+            email: db.currentUser.email,
+            picture: db.currentUser.photoURL,
+            x: x,
+            y: y,
+            time: new Date().getTime()
+        });
+    };
+
     ['createTopic', 'createSubTopic', 'updateTopic', 'updateSubTopic'].forEach(function (key) {
         AddCallbackAfter(db, key, function (db) {
             save(db.topics);
@@ -56,6 +72,15 @@ function createDB(topics) {
     });
     return db;
 }
+
+function onUserChanges(userSnapshot) {
+    if (!db) {
+        db = createDB([]);
+    }
+    db.users = userSnapshot.val();
+    createUI();
+}
+
 function AddCallbackAfter(object, name, callback) {
     var original = object[name];
     object[name] = function () {
@@ -71,16 +96,54 @@ function save(state) {
 }
 
 var db;
-ref.on('value', function (snapshot) {
-    if (!db) {
-        db = createDB();
-    }
-    db.topics = snapshot.val();
-    createUI();
-});
-
 
 //STATE
+//Auth
+var userRef = firebase.database().ref('users');
+firebase.auth().onAuthStateChanged(function (user) {
+    if (!db) {
+        db = createDB([]);
+    }
+    if(user) {
+        userRef.on('value', onUserChanges);
+        document.addEventListener('mousemove', mouseMove);
+            ref.on('value', function (snapshot) {
+            if (!db) {
+                db = createDB();
+            }
+            db.topics = snapshot.val();
+            createUI();
+        });
+    } else {
+        userRef.off();
+        document.removeEventListener('mousemove', mouseMove);
+        ref.off('value');
+    }
+    db.setUser(user);
+});
+
+function mouseMove(e) {
+    db.setUserPos(e.pageX, e.pageY);
+}
+
+function signOut() {
+    firebase.auth().signOut();
+}
+
+function signIn() {
+    var provider = new firebase.auth.GoogleAuthProvider();
+    firebase.auth().signInWithPopup(provider).catch(function (error) {
+        var errorCode = error.code;
+        var errorMessage = error.message;
+        var email = error.email;
+        var credential = error.credential;
+        console.log(errorCode, errorMessage, email, credential);
+        alert(errorMessage);
+    });
+}
+
+//Auth
+
 
 //UI
 
@@ -105,6 +168,34 @@ function button(label, callback) {
     }, label);
 }
 
+function users(db) {
+    return h('span',Object.keys(db.users).map(function (userId) {
+        var user = db.users[userId];
+        return h('img.user', {
+            props: {
+                src: user.picture,
+                title: user.name
+            },
+            style: {
+                left: user.x + 'px',
+                top: user.y + 'px'
+            }
+        })
+    }));
+}
+
+function userPanel(db) {
+    var content = db.currentUser ?
+        h('div',[
+            h('img',{props:{src: db.currentUser.photoURL}}),
+            h('div',[button('Sign Out',signOut)])
+        ])
+        :
+        button('Sign In',signIn);
+
+    return h('div.userPanel',[content]);
+}
+
 function input(value, callback) {
     return h('input', {
         on: {
@@ -118,12 +209,16 @@ function input(value, callback) {
 
 function createUI() {
     vnode = patch(vnode,
-        h('div', db.topics.map(function (topic) {
+        h('div',
+            (db.currentUser ? db.topics.map(function (topic) {
                 return topicElement(db, topic);
-            }).concat(footer(db))
+            }) : []).concat(footer(db),userPanel(db), users(db))
         )
     );
 }
+
+
+
 
 
 function topicElement(db, topic) {
@@ -144,10 +239,6 @@ function topicElement(db, topic) {
     ))
 }
 
-function addSubTopicElement(db, topic, subtopicData, subTopicsElement) {
-    var subtopicElement = subtopic(db, topic, subtopicData);
-    subTopicsElement.appendChild(subtopicElement);
-}
 
 function subtopicElement(db, topic, subtopicData) {
     return h('li', [
