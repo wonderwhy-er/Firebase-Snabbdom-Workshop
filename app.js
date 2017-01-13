@@ -3,9 +3,9 @@ function GUID() {
 }
 
 //STATE
-function createDB() {
+function createDB(topics) {
     var db = {
-        topics: []
+        topics: topics
     };
 
     db.createTopic = function () {
@@ -49,51 +49,33 @@ function createDB() {
         subTopic.text = text;
     };
 
-    db.moveTopicUp = function (key) {
-        var topic = db.getTopic(key);
-        var index = db.topics.indexOf(topic);
-        var previous = db.topics[index - 1];
-        if (previous) {
-            db.topics[index - 1] = topic;
-            db.topics[index] = previous;
-        }
-    }
-
-    db.moveTopicDown = function (key) {
-        var topic = db.getTopic(key);
-        var index = db.topics.indexOf(topic);
-        var previous = db.topics[index + 1];
-        if (previous) {
-            db.topics[index + 1] = topic;
-            db.topics[index] = previous;
-        }
-    }
-
-    db.moveSubTopicUp = function (topicKey, subTopicKey) {
-        var topic = db.getTopic(topicKey);
-        var subtopic = db.getSubTopic(topicKey, subTopicKey);
-        var index = topic.subtopics.indexOf(subtopic);
-        var previous = topic.subtopics[index - 1];
-        if (previous) {
-            topic.subtopics[index - 1] = topic;
-            topic.subtopics[index] = previous;
-        }
-    }
-
-    db.moveSubTopicDown = function (topicKey, subTopicKey) {
-        var topic = db.getTopic(topicKey);
-        var subtopic = db.getSubTopic(topicKey, subTopicKey);
-        var index = topic.subtopics.indexOf(subtopic);
-        var previous = topic.subtopics[index + 1];
-        if (previous) {
-            topic.subtopics[index + 1] = topic;
-            topic.subtopics[index] = previous;
-        }
-    }
+    ['createTopic', 'createSubTopic', 'updateTopic', 'updateSubTopic'].forEach(function (key) {
+        AddCallbackAfter(db, key, function (db) {
+            save(db.topics);
+        });
+    });
     return db;
 }
+function AddCallbackAfter(object, name, callback) {
+    var original = object[name];
+    object[name] = function () {
+        var result = original.apply(object, arguments);
+        callback(object);
+        return result;
+    }
+}
 
-var db = createDB();
+var ref = firebase.database().ref('planner');
+function save(state) {
+    ref.set(state);
+}
+
+var db;
+ref.once('value').then( function (topicsSnapshot) {
+    db = createDB(topicsSnapshot.val());
+    createUI();
+});
+
 
 //STATE
 
@@ -105,8 +87,10 @@ function createUI() {
     var topics = fromHTMLString('<div></div>')[0];
     container.appendChild(topics)
     container.appendChild(footer(db, topics));
-    db.topics.forEach(function(topic) {
-        addTopicElement(db,topic,topics);
+
+
+    db.topics.forEach(function (topic) {
+        addTopicElement(db, topic, topics);
     });
 }
 
@@ -132,17 +116,19 @@ function topic(db, topic) {
     var subtopics = topicElement.children[3].children[0];
     topicElement.children[2].addEventListener('click', function () {
         var subtopicData = db.createSubTopic(topic.key);
-        addSubTopicElement(db,topic,subtopicData,subtopics);
+        addSubTopicElement(db, topic, subtopicData, subtopics);
     });
 
-    topic.subtopics.forEach(function(subtopicData) {
-        addSubTopicElement(db,topic,subtopicData,subtopics);
-    });
-
+    if(topic.subtopics) {
+        topic.subtopics.forEach(function (subtopicData) {
+            addSubTopicElement(db, topic, subtopicData, subtopics);
+        });
+    }
+    
     return topicElement;
 }
 
-function addSubTopicElement(db,topic,subtopicData,subTopicsElement) {
+function addSubTopicElement(db, topic, subtopicData, subTopicsElement) {
     var subtopicElement = subtopic(db, topic, subtopicData);
     subTopicsElement.appendChild(subtopicElement);
 }
@@ -170,5 +156,4 @@ function footer(db, topicContainer) {
     return footer;
 }
 
-createUI();
 //UI
